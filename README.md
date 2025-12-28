@@ -4,7 +4,7 @@
 
 ##  Descripción
 
-**[Nombre del Proyecto]** es una aplicación de código abierto diseñada para traducir entre español y lenguas indígenas de la región amazónica (Guahibo).
+**Amazonia.IA** es una aplicación de código abierto diseñada para traducir entre español y lenguas indígenas de la región amazónica (Guahibo).
 
 Este proyecto busca reducir las barreras de comunicación y apoyar la revitalización de lenguas en peligro de extinción mediante el uso de modelos de aprendizaje automático y colaboración comunitaria.
 
@@ -33,7 +33,7 @@ Sigue estos pasos para ejecutar el proyecto en tu entorno local.
 
 1.  **Clonar el repositorio**
     ```bash
-    git clone [https://github.com/tu-usuario/nombre-del-proyecto.git](https://github.com/tu-usuario/nombre-del-proyecto.git)
+    git clone [https://github.com/jimenaazocar05/Amazonia.IA.git](https://github.com/jimenaazocar05/Amazonia.IA)
     cd nombre-del-proyecto
     ```
 
