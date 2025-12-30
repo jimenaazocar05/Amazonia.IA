@@ -6,6 +6,10 @@
       "sampling_rate": 16000,
       "_type": "Audio"
     },
+    "sentence": {
+      "dtype": "string",
+      "_type": "Value"
+    },
     "category": {
       "dtype": "string",
       "_type": "Value"

@@ -1,116 +1,128 @@
 import os
-from datasets import Dataset, DatasetDict, Audio, concatenate_datasets
 import glob
+import pandas as pd
+from datasets import Dataset, Audio, DatasetDict
 
-# --- Configuration ---
-# Directory containing the source folders
-# Use the directory where this script is located
-SOURCE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATOS_FINALES_DIR = os.path.join(SOURCE_DIR, 'datos_finales')
-OUTPUT_DIR = os.path.join(SOURCE_DIR, 'mms_finetuning_data')
+# --- CONFIGURACIÓN ---
+BASE_DIR = "./datos_finales"
+PATH_CLEAN_TRAIN = os.path.join(BASE_DIR, "trainClean_wav")
+PATH_AUG_TRAIN   = os.path.join(BASE_DIR, "trainAugmentation_wav")
+PATH_TEST        = os.path.join(BASE_DIR, "test_wav")
 
-# Constants
 SAMPLING_RATE = 16000
-TEST_SIZE_PERCENT = 0.1  # 10% for testing synthetic data
-SEED = 42  # For reproducibility
 
-def load_audio_paths_from_path(full_folder_path, category_label):
+def normalize_id(path_str):
     """
-    Loads all .wav files from a specific full path.
-    Returns a list of dictionaries with 'audio' (path) and 'category' (label).
+    Convierte rutas sucias como 'trainClean_wav\audio_59_clean.wav'
+    a un ID limpio: 'audio_59_clean'
     """
-    if not os.path.exists(full_folder_path):
-        print(f"Warning: Folder not found at {full_folder_path}. Returning empty list.")
-        return []
+    # Eliminar extensión
+    name = os.path.splitext(os.path.basename(path_str))[0]
+    return name.strip()
 
-    audio_files = glob.glob(os.path.join(full_folder_path, "*.wav"))
-    print(f"Found {len(audio_files)} files in '{os.path.basename(full_folder_path)}'")
+def load_data_from_folder(folder_path, category_label, csv_path):
+    data = []
     
-    return [{"audio": f, "category": category_label} for f in audio_files]
+    # 1. Cargar CSV y crear diccionario de búsqueda
+    df = pd.read_csv(csv_path)
+    text_mapping = {}
+    
+    print(f"   - Indexando CSV {os.path.basename(csv_path)}...")
+    for _, row in df.iterrows():
+        # Asumiendo columnas 'audio_path' y 'sentence' que vi en tu archivo
+        # Limpiamos el ID del CSV (quitamos carpetas y barras)
+        raw_id = str(row['audio_path'])
+        clean_id = normalize_id(raw_id)
+        
+        text = str(row['sentence']).strip()
+        text_mapping[clean_id] = text
 
-def main():
-    print("--- Starting Data Pipeline for Meta MMS Fine-Tuning ---")
+    # 2. Buscar archivos físicos
+    files = glob.glob(os.path.join(folder_path, "*.wav"))
+    print(f"   - Procesando {len(files)} audios en {folder_path}...")
     
-    # 1. Load 'trainClean_wav' (Synthethic TTS) -> was 'original'
-    print("\n1. Loading 'trainClean_wav' (Original/Synthetic)...")
-    original_path = os.path.join(DATOS_FINALES_DIR, 'trainClean_wav')
-    original_data = load_audio_paths_from_path(original_path, 'original')
+    found_count = 0
+    missing_count = 0
     
-    if not original_data:
-        print(f"Error: No data found in {original_path}. Cannot proceed.")
-        return
+    for file_path in files:
+        # Obtenemos el ID del archivo físico actual
+        file_name = os.path.basename(file_path)
+        file_id = normalize_id(file_name)
+        
+        transcription = None
+        
+        # CASO 1: Búsqueda directa (ej: audio_59_clean)
+        if file_id in text_mapping:
+            transcription = text_mapping[file_id]
+            
+        # CASO 2: Manejo de Aumentación (ej: audio_59_aug_0 -> buscar audio_59_clean)
+        # Tu CSV tiene las rutas de aumentación, pero a veces los nombres varían.
+        # Si no lo encontró directo, probamos lógica de limpieza.
+        if not transcription and "_aug_" in file_id:
+            # Intentar reconstruir el ID original. 
+            # Suponiendo que audio_59_aug_0 viene de audio_59_clean
+            # Estrategia: buscar la raíz "audio_59"
+            parts = file_id.split("_aug_")
+            base_part = parts[0] # audio_59
+            
+            # Buscamos en el mapa algo que empiece igual
+            # (Esto es lento pero seguro para datasets pequeños)
+            for k, v in text_mapping.items():
+                if k.startswith(base_part + "_clean") or k == base_part:
+                    transcription = v
+                    break
 
-    ds_original = Dataset.from_list(original_data)
-    
-    # 2. Split 'original' into 90% Train / 10% Test
-    print(f"2. Splitting 'original' into {100 - TEST_SIZE_PERCENT*100}% Train and {TEST_SIZE_PERCENT*100}% Test...")
-    split_dataset = ds_original.train_test_split(test_size=TEST_SIZE_PERCENT, seed=SEED)
-    
-    train_synthetic = split_dataset['train']
-    test_synthetic = split_dataset['test']  # This is Metric A
-    
-    print(f"   -> Train Synthetic: {len(train_synthetic)} samples")
-    print(f"   -> Test Synthetic (Metric A): {len(test_synthetic)} samples")
+        if transcription:
+            data.append({
+                "audio": file_path,
+                "sentence": transcription,
+                "category": category_label
+            })
+            found_count += 1
+        else:
+            # 🚨 ERROR: No agregar si no hay texto. Mejor perder un audio que dañar el modelo.
+            # print(f"❌ Texto no encontrado para: {file_id}") 
+            missing_count += 1
 
-    # 3. Load 'trainAugmentation_wav' (Augmented Data) -> was 'augment'
-    print("\n3. Loading 'trainAugmentation_wav' (Augmented)...")
-    augment_path = os.path.join(DATOS_FINALES_DIR, 'trainAugmentation_wav')
-    augment_data = load_audio_paths_from_path(augment_path, 'augment')
-    
-    if augment_data:
-        ds_augment = Dataset.from_list(augment_data)
-        # 4. Mix 'augment' into Training Set
-        train_combined = concatenate_datasets([train_synthetic, ds_augment])
-        print(f"   -> Added {len(ds_augment)} augmented samples to training.")
-    else:
-        train_combined = train_synthetic
-        print("   -> No augmented data found. Using only synthetic original for training.")
+    print(f"   ✅ Encontrados: {found_count} | ❌ Perdidos (sin texto): {missing_count}")
+    return data
 
-    print(f"   -> Final Training Set: {len(train_combined)} samples")
+# --- EJECUCIÓN ---
+print("🚀 Iniciando regeneración de Vista Minable (V2 - Strict)...")
 
-    # 5. Load 'reales' (Real Native Speaker Data)
-    # Checking both root 'reales' and 'datos_finales/reales' just in case
-    print("\n4. Loading 'reales' audios...")
-    reales_path_root = os.path.join(SOURCE_DIR, 'reales')
-    
-    # We check root first, then datos_finales if needed.
-    # But user said they don't have them yet. Let's stick to root 'reales' as placeholder 
-    # or allow flexibility.
-    real_data = load_audio_paths_from_path(reales_path_root, 'reales')
-    
-    if real_data:
-        test_real = Dataset.from_list(real_data) # This is Metric B
-        print(f"   -> Real Test Set (Metric B): {len(test_real)} samples")
-    else:
-        # Create an empty dataset with the same features
-        test_real = Dataset.from_dict({"audio": [], "category": []})
-        print("   -> No real data found (Metric B will be empty).")
+csv_train_path = os.path.join(BASE_DIR, "train.csv")
+csv_test_path  = os.path.join(BASE_DIR, "test.csv")
 
-    # 6. Assemble DatasetDict
-    splits = {
-        'train': train_combined,
-        'test_synthetic': test_synthetic, # Metric A
-    }
+# 1. Cargar datos
+print("\n📂 Cargando Train Clean...")
+ds_clean = load_data_from_folder(PATH_CLEAN_TRAIN, "clean", csv_train_path)
 
-    if len(test_real) > 0:
-        splits['test_real'] = test_real            # Metric B
-    else:
-        print("   -> Skipping 'test_real' in DatasetDict because it is empty (to avoid save errors).")
+print("\n📂 Cargando Train Augmentation...")
+ds_aug = load_data_from_folder(PATH_AUG_TRAIN, "augmented", csv_train_path)
 
-    final_dataset = DatasetDict(splits)
+print("\n📂 Cargando Test...")
+ds_test_list = load_data_from_folder(PATH_TEST, "test", csv_test_path)
 
-    # 7. Cast Audio Feature
-    # This automatically loads and resamples the audio when accessed
-    print(f"\n5. Casting audio column to {SAMPLING_RATE}Hz...")
-    final_dataset = final_dataset.cast_column("audio", Audio(sampling_rate=SAMPLING_RATE))
+# 2. Unificar
+full_train_list = ds_clean + ds_aug
 
-    # 8. Save to Disk
-    print(f"\n6. Saving final DatasetDict to '{OUTPUT_DIR}'...")
-    final_dataset.save_to_disk(OUTPUT_DIR)
-    
-    print("\n--- Pipeline Completed Successfully ---")
-    print("Dataset Structure:")
-    print(final_dataset)
-    
-if __name__ == "__main__":
-    main()
+print(f"\n📊 Resumen Final:")
+print(f"   - Train Total: {len(full_train_list)}")
+print(f"   - Test Total: {len(ds_test_list)}")
+
+if len(full_train_list) == 0:
+    raise ValueError("⚠️  FATAL: No se cargaron datos de entrenamiento. Revisa los nombres en el CSV.")
+
+# 3. Crear DatasetDict
+vista_minable = DatasetDict({
+    "train": Dataset.from_list(full_train_list),
+    "test_synthetic": Dataset.from_list(ds_test_list)
+})
+
+# 4. Casting
+print("🔊 Normalizando audio a 16kHz...")
+vista_minable = vista_minable.cast_column("audio", Audio(sampling_rate=SAMPLING_RATE))
+
+# 5. Guardar
+output_path = "./mms_finetuning_data"
+vista_minable.save_to_disk(output_path)
