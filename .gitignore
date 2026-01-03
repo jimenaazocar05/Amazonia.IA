@@ -1,1 +1,16 @@
-.venv
+# Ignorar carpetas de entrenamiento pesadas
+mms_finetuning_data/
+mms-finetune-guahibo/
+modelo_guahibo_gpu/
+modelo_guahibo_final/
+
+# Ignorar entorno virtual
+.venv/
+env/
+
+# Ignorar archivos temporales de Jupyter
+.ipynb_checkpoints/
+
+# Ignorar cache de Python
+__pycache__/
+*.pyc
