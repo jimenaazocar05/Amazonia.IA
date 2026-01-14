@@ -6,3 +6,4 @@ accelerate==1.0.1
 soundfile
 librosa
 numpy
+requests

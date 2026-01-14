@@ -9,8 +9,25 @@ import os
 warnings.filterwarnings("ignore")
 MODELO_PATH = "./modelo_guahibo_gpu"
 
-# URL de la imagen de fondo (Selva Amazónica)
-URL_FONDO_AMAZONIA = "https://www.mashpilodge.com/wp-content/uploads/2025/07/AdobeStock_1042605634-2048x1148.jpeg"
+# URL de la imagen de fondo (Local) - Usando Base64 para evitar errores de ruta
+import os
+import base64
+
+def encode_image(image_path):
+    try:
+        with open(image_path, "rb") as image_file:
+            encoded_string = base64.b64encode(image_file.read()).decode()
+            return f"data:image/webp;base64,{encoded_string}"
+    except Exception as e:
+        print(f"Error cargando imagen: {e}")
+        return ""
+
+# Ruta relativa simple ya que assets está en el root
+IMAGE_PATH = os.path.join(os.path.dirname(__file__), "assets", "imagenFondo.webp")
+B64_FONDO = encode_image(IMAGE_PATH)
+
+# Importar traductor
+from translator import translator_instance
 
 # --- 1. PERSONALIZACIÓN VISUAL ---
 
@@ -27,7 +44,7 @@ tema_amazonia = gr.themes.Soft(
 # B) Definir CSS
 css_personalizado = f"""
 .gradio-container {{
-    background-image: url('{URL_FONDO_AMAZONIA}') !important;
+    background-image: url('{B64_FONDO}') !important;
     background-size: cover !important;
     background-position: center !important;
     background-attachment: fixed !important;
@@ -93,9 +110,13 @@ def transcribir(audio_path):
         # Decodificar
         pred_ids = torch.argmax(logits, dim=-1)
         texto = processor.batch_decode(pred_ids)[0]
-        return texto
+        
+        # --- TRADUCCIÓN ---
+        traduccion = translator_instance.translate(texto)
+        
+        return texto, traduccion
     except Exception as e:
-        return f"Error procesando el audio. Detalles: {e}"
+        return f"Error: {e}", "Error procesando el audio"
 
 # --- 4. INTERFAZ GRÁFICA ---
 with gr.Blocks(title="Amazonia.IA", theme=tema_amazonia, css=css_personalizado) as demo:
@@ -123,17 +144,22 @@ with gr.Blocks(title="Amazonia.IA", theme=tema_amazonia, css=css_personalizado) 
         with gr.Column(scale=1):
             # Aquí quité el 'show_copy_button' que daba error
             text_output = gr.Textbox(
-                label="Resultado de la IA", 
-                lines=6,
-                placeholder="La transcripción aparecerá aquí..."
+                label="Transcripción (Jivi)", 
+                lines=3,
+                placeholder="El texto en guahibo aparecerá aquí..."
+            )
+            translation_output = gr.Textbox(
+                label="Traducción (Español)", 
+                lines=3,
+                placeholder="La traducción aparecerá aquí..."
             )
     
-    btn_transcribir.click(fn=transcribir, inputs=audio_input, outputs=text_output)
+    btn_transcribir.click(fn=transcribir, inputs=audio_input, outputs=[text_output, translation_output])
 
     gr.Markdown("---")
-    with gr.Row():
-        with gr.Column(scale=1, min_width=200):
-             gr.Markdown("By Jimena Azocar, Joaquim Juha, Carlos Mendez, Stalin Franco - UCAB Guayana", elem_classes=["text-right"])
+    with gr.Column(scale=1, min_width=200):
+         gr.Markdown("By Jimena Azocar, Joaquim Juha, Carlos Mendez, Stalin Franco - UCAB Guayana", elem_classes=["text-right"])
+         gr.Markdown("**Integración:** Modelo Wav2Vec2 (Local) + API Traductor (Remoto) + Corpus CSV", elem_classes=["text-right"])
 
 # Lanzar
 if __name__ == "__main__":
