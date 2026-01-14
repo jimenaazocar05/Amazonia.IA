@@ -121,7 +121,8 @@ class Translator:
                 if data.get("status") == "success":
                     return data.get("traduccion")
                 else:
-                    return f"Error API: {data.get('mensaje')}"
+                    # Si la API devuelve un mensaje (ej: palabra no encontrada), lo mostramos directo
+                    return data.get('mensaje', "No se pudo traducir.")
 
             except requests.exceptions.Timeout:
                 print(f"⚠️ Timeout en intento {attempt + 1}.")
