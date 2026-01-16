@@ -14,6 +14,10 @@ class Translator:
         self.load_corpus()
         
         # Initialize HF Client
+        # Force load .env from current directory
+        env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+        load_dotenv(env_path)
+        
         token = os.getenv("HF_TOKEN")
         if not token:
             print("⚠️ Advertencia: No se encontró HF_TOKEN en .env. La traducción podría fallar.")
@@ -23,6 +27,10 @@ class Translator:
 
     def load_corpus(self):
         """Loads the Guahibo-Spanish corpus into memory."""
+        # Use absolute path for csv if not found
+        if not os.path.exists(self.csv_path):
+             self.csv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), self.csv_path)
+
         print(f"📂 Cargando corpus desde: {self.csv_path}")
         try:
             with open(self.csv_path, mode='r', encoding='utf-8') as f:
@@ -80,15 +88,23 @@ class Translator:
             prompt = f"<2es> {text}"
             print(f"🌐 Consultando HF API ({self.model_id})...")
             
-            response = self.client.text_generation(
-                prompt, 
-                model=self.model_id, 
-                max_new_tokens=100
+            # Change to 'translation' task logic or raw post
+            # The error says: Supported tasks: 'translation', got: 'text-generation'
+            # We use translation() helper or post()
+            
+            response = self.client.translation(
+                text=prompt,
+                model=self.model_id
             )
             
-            # Response is just the text generated
-            translation = response.strip()
-            return translation
+            # Response from translation task is usually { 'translation_text': '...' } or list of dicts at root
+            if isinstance(response, dict) and 'translation_text' in response:
+                 return response['translation_text']
+            elif isinstance(response, list) and len(response) > 0 and 'translation_text' in response[0]:
+                 return response[0]['translation_text']
+            else:
+                 # If returns raw string
+                 return str(response).strip()
 
         except Exception as e:
             print(f"❌ Error API HF: {e}")
