@@ -1,9 +1,10 @@
 torch
 torchaudio
-transformers==4.46.0
+transformers==4.57.5
 datasets==2.19.0
 accelerate==1.0.1
 soundfile
 librosa
 numpy
 requests
+gradio

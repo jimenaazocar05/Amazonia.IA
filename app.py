@@ -28,6 +28,7 @@ B64_FONDO = encode_image(IMAGE_PATH)
 
 # Importar traductor
 from translator import translator_instance
+from data_handler import save_contribution
 
 # --- 1. PERSONALIZACIÓN VISUAL ---
 
@@ -131,30 +132,62 @@ with gr.Blocks(title="Amazonia.IA", theme=tema_amazonia, css=css_personalizado) 
         gr.Markdown("Proyecto de prototipo académico para la preservación de lenguas indígenas.")
         gr.Markdown("---")
     
-    with gr.Row(equal_height=True):
-        with gr.Column(scale=1):
-            audio_input = gr.Audio(
-                sources=["microphone", "upload"], 
-                type="filepath", 
-                label="Graba o Sube tu audio",
-                interactive=True
+    with gr.Tabs():
+        # --- TAB 1: TRADUCTOR (Existente) ---
+        with gr.TabItem("Traductor"):
+            with gr.Row(equal_height=True):
+                with gr.Column(scale=1):
+                    audio_input = gr.Audio(
+                        sources=["microphone", "upload"], 
+                        type="filepath", 
+                        label="Graba o Sube tu audio",
+                        interactive=True
+                    )
+                    btn_transcribir = gr.Button("Transcribir Audio", variant="primary", size="lg")
+                
+                with gr.Column(scale=1):
+                    text_output = gr.Textbox(
+                        label="Transcripción (Jivi)", 
+                        lines=3,
+                        placeholder="El texto en guahibo aparecerá aquí..."
+                    )
+                    translation_output = gr.Textbox(
+                        label="Traducción (Español)", 
+                        lines=3,
+                        placeholder="La traducción aparecerá aquí..."
+                    )
+            
+            btn_transcribir.click(fn=transcribir, inputs=audio_input, outputs=[text_output, translation_output])
+
+        # --- TAB 2: CONTRIBUIR (Nuevo) ---
+        with gr.TabItem("Contribuir / Entrenar"):
+            gr.Markdown("### 🎙️ Ayuda a mejorar el modelo")
+            gr.Markdown("Graba tu voz y escribe exactamente lo que dijiste en Guahibo. Estos datos se usarán para reentrenar la IA.")
+            
+            with gr.Row():
+                with gr.Column():
+                    # Input exclusivo de micrófono para nuevos datos
+                    rec_input = gr.Audio(
+                        sources=["microphone"], 
+                        type="filepath", 
+                        label="Grabar Voz (Solo Micrófono)",
+                        interactive=True
+                    )
+                with gr.Column():
+                    transcription_input = gr.Textbox(
+                        label="Texto en Guahibo (Lo que dijiste)", 
+                        placeholder="Escribe aquí la transcripción exacta...",
+                        lines=5
+                    )
+            
+            btn_save = gr.Button("💾 Guardar Contribución", variant="secondary", size="lg")
+            status_output = gr.Textbox(label="Estado", interactive=False)
+            
+            btn_save.click(
+                fn=save_contribution,
+                inputs=[rec_input, transcription_input],
+                outputs=status_output
             )
-            btn_transcribir = gr.Button("Transcribir Audio", variant="primary", size="lg")
-        
-        with gr.Column(scale=1):
-            # Aquí quité el 'show_copy_button' que daba error
-            text_output = gr.Textbox(
-                label="Transcripción (Jivi)", 
-                lines=3,
-                placeholder="El texto en guahibo aparecerá aquí..."
-            )
-            translation_output = gr.Textbox(
-                label="Traducción (Español)", 
-                lines=3,
-                placeholder="La traducción aparecerá aquí..."
-            )
-    
-    btn_transcribir.click(fn=transcribir, inputs=audio_input, outputs=[text_output, translation_output])
 
     gr.Markdown("---")
     with gr.Column(scale=1, min_width=200):
