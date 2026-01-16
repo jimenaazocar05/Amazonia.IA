@@ -8,16 +8,18 @@ from huggingface_hub import HfApi, HfFileSystem
 # Cargar variables de entorno
 # Force load from current directory
 env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
-load_dotenv(env_path)
+load_dotenv(env_path, override=True)
 
 HF_TOKEN = os.getenv("HF_TOKEN")
 REPO_ID = os.getenv("HF_REPO_ID")
 
 class CloudHandler:
     def __init__(self):
+        global HF_TOKEN, REPO_ID
         if not HF_TOKEN or not REPO_ID:
-             # Retry loading without path just in case
+             # Retry loading checking env again
             if not HF_TOKEN: HF_TOKEN = os.getenv("HF_TOKEN")
+            if not REPO_ID: REPO_ID = os.getenv("HF_REPO_ID")
             
             if not HF_TOKEN or not REPO_ID:
                 print(f"⚠️ DEBUG: Env Path tried: {env_path}")
