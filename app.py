@@ -180,7 +180,7 @@ with gr.Blocks(title="Amazonia.IA", theme=tema_amazonia, css=css_personalizado) 
                         lines=5
                     )
             
-            btn_save = gr.Button("💾 Guardar Contribución", variant="secondary", size="lg")
+            btn_save = gr.Button(" Guardar Contribución", variant="secondary", size="lg")
             status_output = gr.Textbox(label="Estado", interactive=False)
             
             btn_save.click(
