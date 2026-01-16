@@ -6,7 +6,9 @@ from dotenv import load_dotenv
 from huggingface_hub import HfApi, HfFileSystem
 
 # Cargar variables de entorno
-load_dotenv()
+# Force load from current directory
+env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+load_dotenv(env_path)
 
 HF_TOKEN = os.getenv("HF_TOKEN")
 REPO_ID = os.getenv("HF_REPO_ID")
@@ -14,7 +16,14 @@ REPO_ID = os.getenv("HF_REPO_ID")
 class CloudHandler:
     def __init__(self):
         if not HF_TOKEN or not REPO_ID:
-            raise ValueError("❌ Faltan las credenciales (HF_TOKEN o HF_REPO_ID) en el archivo .env")
+             # Retry loading without path just in case
+            if not HF_TOKEN: HF_TOKEN = os.getenv("HF_TOKEN")
+            
+            if not HF_TOKEN or not REPO_ID:
+                print(f"⚠️ DEBUG: Env Path tried: {env_path}")
+                print(f"⚠️ DEBUG: HF_TOKEN present: {bool(HF_TOKEN)}")
+                print(f"⚠️ DEBUG: REPO_ID present: {bool(REPO_ID)}")
+                raise ValueError("❌ Faltan las credenciales (HF_TOKEN o HF_REPO_ID) en el archivo .env")
         
         self.api = HfApi(token=HF_TOKEN)
         self.fs = HfFileSystem(token=HF_TOKEN)
