@@ -51,10 +51,25 @@ def save_contribution(audio_path, text):
         # librosa carga a mono=True por defecto y hace resample si se especifica sr
         y, sr = librosa.load(audio_path, sr=16000)
         
-        # 3. Guardar Audio Procesado
+        # 3. Guardar Audio Procesado (Temporalmente en disco)
         sf.write(save_path, y, 16000)
         
-        # 4. Guardar en CSV
+        # 4. SUBIDA A LA NUBE (Hugging Face)
+        from cloud_handler import cloud_handler
+        
+        msg_extra = ""
+        if cloud_handler:
+            success, msg = cloud_handler.upload_audio(save_path, text.strip())
+            if success:
+                msg_extra = f"\n☁️ {msg}"
+                # Opcional: Borrar archivo local si ya está seguro en la nube
+                # os.remove(save_path) 
+            else:
+                msg_extra = f"\n⚠️ Falló subida a nube: {msg}"
+        else:
+            msg_extra = "\n⚠️ Nube no configurada (.env faltante)"
+
+        # 5. Guardar en CSV Local (Registro de respaldo)
         # Usamos ruta relativa para el CSV: nuevos_audios_wav/filename.wav
         relative_path = os.path.join("nuevos_audios_wav", filename)
         
@@ -62,7 +77,7 @@ def save_contribution(audio_path, text):
             writer = csv.writer(f)
             writer.writerow([relative_path, text.strip()])
             
-        return f"✅ ¡Guardado Exitoso! \nAudio: {filename}\nTexto: {text}"
+        return f"✅ ¡Guardado Exitoso! \nAudio: {filename}\nTexto: {text}{msg_extra}"
         
     except Exception as e:
         print(f"Error al guardar contribución: {e}")
