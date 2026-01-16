@@ -7,7 +7,7 @@ import os
 
 # --- CONFIGURACIÓN ---
 warnings.filterwarnings("ignore")
-MODELO_PATH = "./mms-finetune-guahibo"
+MODELO_PATH = "./modelo_guahibo_gpu"
 
 # URL de la imagen de fondo (Local) - Usando Base64 para evitar errores de ruta
 import os
