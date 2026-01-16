@@ -9,3 +9,4 @@ numpy
 requests
 gradio
 python-dotenv
+huggingface_hub
