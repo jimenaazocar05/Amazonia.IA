@@ -84,9 +84,15 @@ print("⏳ Cargando modelo para la App... Espere un momento.")
 try:
     processor = Wav2Vec2Processor.from_pretrained(MODELO_PATH)
     model = Wav2Vec2ForCTC.from_pretrained(MODELO_PATH)
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    if torch.cuda.is_available():
+        device = "cuda"
+        print(f"✅ GPU Detectada: {torch.cuda.get_device_name(0)}")
+    else:
+        device = "cpu"
+        print("⚠️ GPU no detectada, usando CPU. El modelo funcionará más lento.")
+
     model.to(device)
-    print(f"✅ Modelo cargado en: {device.upper()}")
+    print(f"✅ Modelo cargado exitosamente en: {device.upper()}")
 except Exception as e:
     print(f"❌ Error fatal cargando modelo: {e}")
     exit()
@@ -104,9 +110,16 @@ def transcribir(audio_path):
         # Procesar
         inputs = processor(audio, sampling_rate=16000, return_tensors="pt", padding=True)
         
+        # Mover tensores al dispositivo (GPU/CPU)
+        input_values = inputs.input_values.to(device)
+        attention_mask = inputs.attention_mask.to(device) if "attention_mask" in inputs else None
+
         # Predicción
         with torch.no_grad():
-            logits = model(inputs.input_values.to(device)).logits
+            if attention_mask is not None:
+                logits = model(input_values, attention_mask=attention_mask).logits
+            else:
+                logits = model(input_values).logits
         
         # Decodificar
         pred_ids = torch.argmax(logits, dim=-1)
